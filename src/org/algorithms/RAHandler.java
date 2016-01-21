@@ -1,8 +1,5 @@
 package org.algorithms;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.utils.Node;
 
 public class RAHandler implements Comparable<RAHandler> {

@@ -1,6 +1,5 @@
 package org.net;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 
 import java.net.InetAddress;
@@ -8,20 +7,13 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 
-import java.security.NoSuchAlgorithmException;
-
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 
 import org.algorithms.RA;
 import org.apache.xmlrpc.XmlRpcException;
-import org.apache.xmlrpc.XmlRpcRequest;
 import org.apache.xmlrpc.client.XmlRpcClient;
 import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
-import org.apache.xmlrpc.common.XmlRpcHttpRequestConfig;
-import org.apache.xmlrpc.server.AbstractReflectiveHandlerMapping;
 import org.apache.xmlrpc.server.PropertyHandlerMapping;
 import org.apache.xmlrpc.server.XmlRpcServer;
 import org.apache.xmlrpc.server.XmlRpcServerConfigImpl;
@@ -32,13 +24,15 @@ import org.utils.Node;
 /**
  * The local representation of the XML-RPC network with different nodes. 
  */
-public class Network {
+public class LocalEndPoint {
 	public static final int MUTUAL_EXCLUSION_MODE = 1;	// 0: Centralized Mutual Exclusion, 1: Ricart & Agrawala
 	public static final String LOCAL_HOST = "127.0.0.1"; // Default is localhost.
 	public static final String LOCAL_PORT = "8081"; // Default.
 	
 	public static List<Node> listOfNodes;
 	public static Node localNode;
+	
+	public static String masterstring = "";
 	
 	private Node remoteNode;
 	private WebServer webServer;
@@ -52,7 +46,7 @@ public class Network {
 	 * @throws IOException
 	 * @throws XmlRpcException
 	 */
-	public Network(Node remoteNode) throws NumberFormatException, IOException, XmlRpcException {
+	public LocalEndPoint(Node remoteNode) throws NumberFormatException, IOException, XmlRpcException {
 		this.remoteNode = remoteNode;
 		listOfNodes = new ArrayList<Node>();
 		
@@ -84,7 +78,7 @@ public class Network {
 		Object[] neighborAddress;
 		
 		// Get client for talking with our remote node (which is an XMLRPC server).
-		XmlRpcClient remoteNodeClient = Network.getXmlRpcClient(this.remoteNode);
+		XmlRpcClient remoteNodeClient = LocalEndPoint.getXmlRpcClient(this.remoteNode);
 		
 		// Ask the remote node to join its network. It will return a list of the network's other nodes.
 		Object[] neighbors = 	(	Object[])remoteNodeClient.execute("network.join", 
@@ -97,7 +91,7 @@ public class Network {
 		// For all other nodes get their address and store it in the node list.
 		for(Object neighbor : neighbors) {
 			neighborAddress = (Object[])neighbor;
-			Network.listOfNodes.add(new Node(InetAddress.getByName((String)neighborAddress[0]), (Integer)neighborAddress[1]));
+			LocalEndPoint.listOfNodes.add(new Node(InetAddress.getByName((String)neighborAddress[0]), (Integer)neighborAddress[1]));
 		}
 		
 		System.out.println("Result: Node joined the network successfully.");
@@ -165,7 +159,7 @@ public class Network {
 			
 			// For all neighbors: Message them that we are leaving.
 			for(Node node : listOfNodes) {
-				if((boolean)Network.getXmlRpcClient(node).execute("network.signOff", new Object[] {
+				if((boolean)LocalEndPoint.getXmlRpcClient(node).execute("network.signOff", new Object[] {
 					LOCAL_HOST, Integer.parseInt(LOCAL_PORT)})) {
 					System.out.println("Result: Node " + node.toString() + " informed.");
 				}
@@ -202,7 +196,7 @@ public class Network {
 			node = new Node(InetAddress.getByName(args[0]), Integer.parseInt(args[1]));
 		}
 		
-		Network network = new Network(node);
+		LocalEndPoint network = new LocalEndPoint(node);
 		
 		// New runnable thread as daemon.
 		RA ra = new RA(network);

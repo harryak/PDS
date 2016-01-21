@@ -6,8 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.xmlrpc.client.XmlRpcClient;
-import org.net.Network;
+import org.net.LocalEndPoint;
 
 public class RA implements Runnable {
 	private List<RAHandler> requests;
@@ -15,9 +14,9 @@ public class RA implements Runnable {
 	private Map<RAHandler, Integer> confirmRequest;
 	private int lamportClock;
 	
-	public Network localNetwork;
+	public LocalEndPoint localNetwork;
 	
-	public RA(Network network) {
+	public RA(LocalEndPoint network) {
 		this.requests = new ArrayList<>();
 		this.pending = new ArrayList<>();
 		this.confirmRequest = new HashMap<>();
@@ -71,7 +70,7 @@ public class RA implements Runnable {
 		Integer num = this.confirmRequest.get(raHandler);
 		if(num == null) num = 0;
 		
-		return Network.listOfNodes.size() <= num;
+		return LocalEndPoint.listOfNodes.size() <= num;
 	}
 	
 	public RAHandler firstRequest(RAHandler raHandler) throws Exception {
@@ -96,7 +95,7 @@ public class RA implements Runnable {
 		while(!stop) {
 			try {
 				Thread.sleep(5000);
-				XmlRpcClient remoteServer = Network.getXmlRpcClient(Network.localNode);
+				//XmlRpcClient remoteServer = Network.getXmlRpcClient(Network.localNode);
 				//remoteServer.execute("network.pending_requests", new Object[]{});
 			} catch(InterruptedException exception) {
 				// Interrupt. We want the server to shut down.
