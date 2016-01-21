@@ -14,7 +14,7 @@ public class RA implements Runnable {
 	private Map<RAHandler, Integer> confirmRequest;
 	private int lamportClock;
 	
-	public LocalEndPoint localNetwork;
+	public LocalEndPoint localEndPoint;
 	
 	public RA(LocalEndPoint network) {
 		this.requests = new ArrayList<>();
@@ -22,7 +22,7 @@ public class RA implements Runnable {
 		this.confirmRequest = new HashMap<>();
 		this.lamportClock = 0;
 		
-		this.localNetwork = network;
+		this.localEndPoint = network;
 	}
 	
 	public List<RAHandler> getRequests() {
@@ -108,7 +108,7 @@ public class RA implements Runnable {
 		}
 		
 		try {
-			this.localNetwork.signOffNetwork();
+			this.localEndPoint.signOffNetwork();
 		} catch(Exception exception) {
 			exception.printStackTrace();
 			stop = true;

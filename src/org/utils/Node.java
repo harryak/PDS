@@ -1,6 +1,8 @@
 package org.utils;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +31,7 @@ public class Node implements Comparable<Node> {
 	 */
 	public Node(InetAddress address, int port) {
 		this.address = address;
-		this.port = port;
+		this.setPort(port);
 		this.isMaster = false;
 	}
 	
@@ -42,12 +44,16 @@ public class Node implements Comparable<Node> {
 	 */
 	public Node(InetAddress address, int port, boolean isMaster) {
 		this.address = address;
-		this.port = port;
+		this.setPort(port);
 		this.isMaster = isMaster;
 	}
 	
 	public InetAddress getAddress() {
 		return this.address;
+	}
+	
+	public String getAddressString() {
+		return this.address.toString();
 	}
 	
 	public int getPort() {
@@ -63,7 +69,34 @@ public class Node implements Comparable<Node> {
 	}
 	
 	public void setPort(int port) {
+		while (!this.isPortAvailable(port)) {
+			port++;
+		}
 		this.port = port;
+	}
+	
+	/**
+	 * Checks to see if a specific port is available.
+	 *
+	 * @param port the port to check for availability
+	 */
+	public boolean isPortAvailable(int port) {
+	    ServerSocket ss = null;
+	    try {
+	        ss = new ServerSocket(port);
+	    } catch (IOException e) {
+	    } finally {
+	        if (ss != null) {
+	            try {
+	                ss.close();
+	                return true;
+	            } catch (IOException e) {
+	                /* should not be thrown */
+	            }
+	        }
+	    }
+
+	    return false;
 	}
 	
 	public void setIsMaster(boolean isMaster) {
@@ -71,7 +104,7 @@ public class Node implements Comparable<Node> {
 	}
 	
 	public String toString() {
-		return "(" + address.getHostAddress() + ", " + port + ")";
+		return this.address.getHostAddress() + ":" + port;
 	}
 	
 	public static List<String[]> asArray(List<Node> listOfNodes) {
