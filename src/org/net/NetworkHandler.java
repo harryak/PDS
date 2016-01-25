@@ -60,6 +60,10 @@ public class NetworkHandler {
 		return LocalEndPoint.listOfNodes.remove(new Node(InetAddress.getByName(host), port));
 	}
 	
+	public void start() {
+		LocalEndPoint.rwProcess();
+	}
+	
 	public String test_call () {
 		System.out.println("Test called!");
 		return "SUCCESS!";

@@ -4,12 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
+import java.net.NetworkInterface;
 import java.net.URL;
 import java.net.UnknownHostException;
 
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 
 import org.algorithms.RA;
@@ -50,9 +53,32 @@ public class LocalEndPoint {
 	public LocalEndPoint(Node remoteNode) throws NumberFormatException, IOException, XmlRpcException {
 		this.remoteNode = remoteNode;
 		LocalEndPoint.listOfNodes = new ArrayList<Node>();
+		InetAddress externalIP = InetAddress.getByName("localhost");	// Be safe to have at least the loopback IP in external IP.
+		
+		// Try to get the IP of this host from outside.
+		try {
+			Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces(); // Get all network interfaces.
+			NetworkInterface nInterface;
+			
+			while ((nInterface = interfaces.nextElement()) != null) {
+				// If the interface is up and not the loopback: Try to get its IP.
+				Enumeration<InetAddress> interfaceAddresses = nInterface.getInetAddresses();
+				if (interfaceAddresses.hasMoreElements()) {
+					InetAddress tmp = interfaceAddresses.nextElement();
+					if (tmp instanceof Inet4Address && !tmp.isLoopbackAddress()) {
+						externalIP = tmp;
+						break;
+					} else {
+						System.out.println(tmp.toString());
+					}
+				}
+			}
+		} catch (Exception ex) {
+			// No error handling needed, we have 127.0.0.1 as fallback.
+		}
 		
 		// Create a new node to represent the local node.
-		LocalEndPoint.localNode = new Node(InetAddress.getByName("localhost"), Integer.parseInt(LocalEndPoint.default_port));
+		LocalEndPoint.localNode = new Node(externalIP, Integer.parseInt(LocalEndPoint.default_port));
 		// Overwrite port if it is not available.
 		LocalEndPoint.localNode.setPort(Integer.parseInt(LocalEndPoint.default_port), true);
 		
@@ -132,7 +158,7 @@ public class LocalEndPoint {
 		
 		// Start the server.
 		this.webServer.start();
-		System.out.println("Result: The server started at port " + LocalEndPoint.localNode.getPort() + " .");
+		System.out.println("Result: The server started at " + LocalEndPoint.localNode.getAddressString() + " .");
 		this.isServerRunning = true;
 	}
 	
@@ -165,26 +191,16 @@ public class LocalEndPoint {
 	 */
 	public void signOffNetwork() throws MalformedURLException, XmlRpcException {
 		System.out.println("Operation: Signing off.");
-		// We can only sign of if we are online.
-		if(isOnline()) {
-			System.out.println("Operation: Other nodes are being informed of the node leaving the network.");
-			
-			// For all neighbors: Message them that we are leaving.
-			for(Node node : listOfNodes) {
-				if((boolean)LocalEndPoint.getXmlRpcClient(node).execute(
-							"network.signOff",
-							new Object[] {
-								LocalEndPoint.localNode.getAddressString(),
-								LocalEndPoint.localNode.getPort()
-							})) {
-					System.out.println("Result: Node " + node.toString() + " informed.");
-				}
-			}
-		}
+		
+		this.executeOnRemoteHosts("network.signOff", new Object[] {
+				LocalEndPoint.localNode.getAddressString(),
+				LocalEndPoint.localNode.getPort()
+			});
 		
 		// If our local server is running, shut it down.
-		if(isServerRunning) {
+		if(this.isServerRunning) {
 			webServer.shutdown();
+			System.out.println("Result: Server was stopped.");
 			isServerRunning = false;
 		}
 	}
@@ -198,13 +214,89 @@ public class LocalEndPoint {
 		return this.isServerRunning && listOfNodes.size() > 0;
 	}
 
+	/**
+	 * Print a list of nodes to the output.
+	 */
 	public void listNodes() {
 		for(Node node : listOfNodes) {
 			System.out.print(node.toString() + " ");
 		}
 		System.out.println();
 	}
+
+	/**
+	 * Start the read/write process on all nodes (inform them).
+	 * 
+	 * @throws MalformedURLException
+	 * @throws XmlRpcException
+	 */
+	public void invokeRWprocess() throws MalformedURLException, XmlRpcException {
+		this.informRemoteHosts("network.start");
+		
+		LocalEndPoint.rwProcess();
+	}
 	
+	/**
+	 * Start election of master node.
+	 * 
+	 * @throws MalformedURLException
+	 * @throws XmlRpcException
+	 */
+	public void electMaster () throws MalformedURLException, XmlRpcException {
+		// We can only do something if we are online.
+		if(this.isOnline()) {
+			System.out.println("Operation: Other nodes are contacted with command ");
+			
+			// Go through all neighbors, inform any with higher ID (= ip + port).
+			for(Node node : listOfNodes) {
+				if (node.getPort() > LocalEndPoint.localNode.getPort()) {
+					if((boolean)LocalEndPoint.getXmlRpcClient(node).execute("network.bully", new Object[] {})) {
+						System.out.println("Result: Node " + node.toString() + " was informed.");
+					}
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Send a command to all nodes without arguments. Just inform them.
+	 * 
+	 * @param command	The command to execute
+	 * @throws MalformedURLException
+	 * @throws XmlRpcException
+	 */
+	private void informRemoteHosts (String command) throws MalformedURLException, XmlRpcException {
+		this.executeOnRemoteHosts(command, new Object[]{});
+	}
+	
+	/**
+	 * Execute a command on all nodes.
+	 * 
+	 * @param command
+	 * @param argument
+	 * 
+	 * @throws MalformedURLException
+	 * @throws XmlRpcException
+	 */
+	private void executeOnRemoteHosts (String command, Object[] argument) throws MalformedURLException, XmlRpcException {
+		// We can only do something if we are online.
+		if(this.isOnline()) {
+			System.out.println("Operation: Other nodes are contacted with command " + command);
+			
+			// For all neighbors: Message them that we are leaving.
+			for(Node node : listOfNodes) {
+				if((boolean)LocalEndPoint.getXmlRpcClient(node).execute(command, argument)) {
+					System.out.println("Result: Node " + node.toString() + " was informed.");
+				}
+			}
+		} else {
+			System.out.println("Error: Local endpoint is not in network.");
+		}
+	}
+	
+	public static void rwProcess() {
+	}
+
 	/**
 	 * The main server function. Connects to other nodes and then starts a server thread.
 	 * 
@@ -258,9 +350,11 @@ public class LocalEndPoint {
 					switch (nextCmd) {
 						case "start":
 							System.out.println("Operation: Command start.");
+							network.invokeRWprocess();
 							break;
 						
 						case "stop":
+						case "signoff":
 							System.out.println("Operation: Command stop.");
 							thread.interrupt();
 							thread.join();
@@ -273,7 +367,7 @@ public class LocalEndPoint {
 							break;
 							
 						default:
-							System.out.println("Result: Command not recognized.");
+							System.out.println("Result: Supported commands:\nstart - start the read/write process\nstop|signoff - sign off the network and stop program\nlist - list all connected nodes");
 							break;
 					}
 				}
