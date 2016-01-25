@@ -31,7 +31,7 @@ public class Node implements Comparable<Node> {
 	 */
 	public Node(InetAddress address, int port) {
 		this.address = address;
-		this.setPort(port);
+		this.port = port;
 		this.isMaster = false;
 	}
 	
@@ -53,7 +53,7 @@ public class Node implements Comparable<Node> {
 	}
 	
 	public String getAddressString() {
-		return this.address.toString();
+		return this.address.getHostAddress();
 	}
 	
 	public int getPort() {
@@ -69,7 +69,11 @@ public class Node implements Comparable<Node> {
 	}
 	
 	public void setPort(int port) {
-		while (!this.isPortAvailable(port)) {
+		this.port = port;
+	}
+	
+	public void setPort(int port, boolean check) {
+		while (check && !this.isPortAvailable(port)) {
 			port++;
 		}
 		this.port = port;

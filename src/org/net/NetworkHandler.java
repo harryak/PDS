@@ -26,7 +26,7 @@ public class NetworkHandler {
 	 * @throws UnknownHostException
 	 */
 	public List<String[]> join(String host, int port) throws MalformedURLException, XmlRpcException, UnknownHostException {
-		System.out.println("\n(" + host + "," + port + ") joining...");
+		System.out.println(host + ":" + port + " joining...");
 		
 		// Get the list of old nodes in this network before the new node joined.
 		List<Node> oldNodes = new ArrayList<>(LocalEndPoint.listOfNodes);
@@ -55,6 +55,7 @@ public class NetworkHandler {
 	 * @throws UnknownHostException
 	 */
 	public boolean signOff(String host, int port) throws UnknownHostException {
+		System.out.println("Result: Node " + host + ":" + port + " has left the network.");
 		// Simply remove the node from our local list.
 		return LocalEndPoint.listOfNodes.remove(new Node(InetAddress.getByName(host), port));
 	}

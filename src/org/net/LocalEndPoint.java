@@ -51,17 +51,25 @@ public class LocalEndPoint {
 		this.remoteNode = remoteNode;
 		LocalEndPoint.listOfNodes = new ArrayList<Node>();
 		
+		// Create a new node to represent the local node.
+		LocalEndPoint.localNode = new Node(InetAddress.getByName("localhost"), Integer.parseInt(LocalEndPoint.default_port));
+		// Overwrite port if it is not available.
+		LocalEndPoint.localNode.setPort(Integer.parseInt(LocalEndPoint.default_port), true);
+		
 		// Do we have a remote node?
 		if(remoteNode != null) {
 			// Then add it to our list of nodes.
 			LocalEndPoint.listOfNodes.add(remoteNode);
+			
+			// And join its network.
+			joinNetwork();
 		}
 		
-		// Create a new node to represent the local node.
-		LocalEndPoint.localNode = new Node(InetAddress.getLocalHost(), Integer.parseInt(LocalEndPoint.default_port));
-		
-		joinNetwork();
-		startLocalXmlRpcServer();
+		try {
+			startLocalXmlRpcServer();
+		} catch (Exception exception) {
+			System.out.println("Exception: Could not start local server: " + exception.getMessage());
+		}
 	}
 	
 	/**
@@ -73,7 +81,7 @@ public class LocalEndPoint {
 	 * @throws UnknownHostException
 	 */
 	private void joinNetwork() throws MalformedURLException, XmlRpcException, NumberFormatException, UnknownHostException {
-		if(this.remoteNode == null) return;
+		if (this.remoteNode == null) return;
 		
 		System.out.println("Operation: Joining the network.");
 		Object[] neighborAddress;
@@ -85,7 +93,7 @@ public class LocalEndPoint {
 		Object[] neighbors = 	(	Object[])remoteNodeClient.execute("network.join", 
 									new Object[] {
 										LocalEndPoint.localNode.getAddressString(),
-										Integer.parseInt(default_port)
+										LocalEndPoint.localNode.getPort()
 									}
 								);
 		
@@ -109,8 +117,8 @@ public class LocalEndPoint {
 		System.out.println("Operation: Starting the server.");
 		
 		// Define the local web server.
-		this.webServer = new WebServer(Integer.parseInt(default_port), LocalEndPoint.localNode.getAddress());
-		XmlRpcServer xmlRpcServer = webServer.getXmlRpcServer();
+		this.webServer = new WebServer(LocalEndPoint.localNode.getPort(), LocalEndPoint.localNode.getAddress());
+		XmlRpcServer xmlRpcServer = this.webServer.getXmlRpcServer();
 		
 		// Handle incoming requests with the NetworkHandler class.
 		PropertyHandlerMapping phm = new PropertyHandlerMapping();
@@ -139,6 +147,9 @@ public class LocalEndPoint {
 		XmlRpcClientConfigImpl rpcConfig = new XmlRpcClientConfigImpl();
 		rpcConfig.setServerURL(new URL("http://" + node.getAddress().getHostAddress() + ":" + 
 				Integer.toString(node.getPort())));
+		rpcConfig.setEnabledForExtensions(true);  
+		rpcConfig.setConnectionTimeout(60 * 1000);
+		rpcConfig.setReplyTimeout(60 * 1000);
 		
 		XmlRpcClient client = new XmlRpcClient();
 		client.setConfig(rpcConfig);
@@ -186,6 +197,13 @@ public class LocalEndPoint {
 	public boolean isOnline() {
 		return this.isServerRunning && listOfNodes.size() > 0;
 	}
+
+	public void listNodes() {
+		for(Node node : listOfNodes) {
+			System.out.print(node.toString() + " ");
+		}
+		System.out.println();
+	}
 	
 	/**
 	 * The main server function. Connects to other nodes and then starts a server thread.
@@ -195,13 +213,15 @@ public class LocalEndPoint {
 	 */
 	public static void main(String args[]) throws Exception {
 		Node node = null;
+		boolean stop = false;
+		String nextCmd;
+		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
 		
 		// Do we have a node to connect to via arguments?
 		if(args.length == 2) {
 			node = new Node(InetAddress.getByName(args[0]), Integer.parseInt(args[1]));
 		} else {
 			// If not, either do nothing or read them in from stdin.
-			BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
 			String commandString, ipString, portString;
 			
 			System.out.println("Should this node connect to an existing network? (y/n)");
@@ -209,7 +229,7 @@ public class LocalEndPoint {
 				System.out.println("Error while reading the input. Please try again.");
 			}
 			
-			if (commandString == "y") {
+			if (commandString.startsWith("y")) {
 				// Read in IP and port.
 				System.out.println("Please write a node's IP to connect to.");
 				while ((ipString = in.readLine()) == null || ipString.length() < 1) {
@@ -232,6 +252,32 @@ public class LocalEndPoint {
 			Thread thread = new Thread(ra);
 			thread.setDaemon(true);
 			thread.start();
+			
+			while (!stop) {
+				if ((nextCmd = in.readLine()) != null && nextCmd.length() > 0) {
+					switch (nextCmd) {
+						case "start":
+							System.out.println("Operation: Command start.");
+							break;
+						
+						case "stop":
+							System.out.println("Operation: Command stop.");
+							thread.interrupt();
+							thread.join();
+							System.out.println("Result: End of program.");
+							return;
+							
+						case "list":
+							System.out.println("Operation: Listing all connected nodes: ");
+							network.listNodes();
+							break;
+							
+						default:
+							System.out.println("Result: Command not recognized.");
+							break;
+					}
+				}
+			}
 		} catch (Exception exception) {
 			System.out.println("Exception: " + exception.getMessage());
 		}

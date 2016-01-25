@@ -91,27 +91,27 @@ public class RA implements Runnable {
 	
 	@Override
 	public void run() {
-		boolean stop = false;
-		while(!stop) {
-			try {
-				Thread.sleep(5000);
+		try {
+			while(true) {
+				if (Thread.currentThread().isInterrupted()) {
+					throw new InterruptedException();
+				}
+				Thread.sleep(3000);
 				//XmlRpcClient remoteServer = Network.getXmlRpcClient(Network.localNode);
 				//remoteServer.execute("network.pending_requests", new Object[]{});
-			} catch(InterruptedException exception) {
-				// Interrupt. We want the server to shut down.
-				stop = true;
-			} catch(Exception exception) {
-				// True Exception. Most likely we didn't want the server to shut down, so print stack trace.
-				exception.printStackTrace();
-				stop = true;
 			}
+		} catch(InterruptedException exception) {
+			// Interrupt. We want the server to shut down.
+			Thread.currentThread().interrupt();
+		} catch(Exception exception) {
+			// True Exception. Most likely we didn't want the server to shut down, so print stack trace.
+			exception.printStackTrace();
 		}
 		
 		try {
 			this.localEndPoint.signOffNetwork();
 		} catch(Exception exception) {
 			exception.printStackTrace();
-			stop = true;
 		}
 	}
 
